@@ -1,32 +1,3 @@
-# Goals
+It’s a month-view goals tracker that stores per-day data in localStorage and visualizes progress with bars and a click-based intensity overlay.
 
-A minimal month-view tracker. Click a day to darken it; more clicks = darker. Data persists per month in localStorage. Right-click to decrement.
-
-## Run
-
-Just open `index.html` in a browser. No build step.
-
-## Features
-
-- Month navigation
-- Weekday header (Sun–Sat)
-- Click to increment intensity; right-click to decrement
-- Local persistence per month
-- Keyboard and screen-reader friendly labels
-- Customizable numeric fields and goals (up to 5) with per-field X condition (over/under)
-
-## Notes
-
-- Max visual intensity after several clicks; additional clicks keep the darkest shade.
-- Storage keys are namespaced by `YYYY-MM` using `localStorage` under `goals:*`.
-
-## Settings
-
-- Click the gear button next to the month to open Settings.
-- Add up to 5 fields. For each field set:
-  - Name (label)
-  - Key (used to store the value)
-  - Goal (numeric target)
-  - X when: choose "under" (incomplete) or "over" (exceeds)
-- The day modal will show inputs for these fields. Bars render for each field showing progress towards the goal.
-
+What it does Calendar UI: Month grid with weekday header and prev/next navigation. Click behaviors: Click a day: open modal to edit details - calories/macros/workout. Ctrl/Cmd-click: increment “intensity” (darkness). Right-click: decrement intensity. Per-day data: calories, protein, pushups, crunches, miles, workoutDone, dietNotes, workoutNotes, plus clicks. Progress bars: Five bars show percent of daily goals (GOALS in script.js). Over-limit marking: For past days, shows red warning overlay if calories exceed or other metrics are under goals. Persistence: Saves to localStorage under goals:YYYY-MM. Run: Open index.html directly; no build step.
