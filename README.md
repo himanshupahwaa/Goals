@@ -13,3 +13,4 @@ Progress bars: Five bars show percent of daily goals (GOALS in script.js).
 Over-limit marking: For past days, shows red warning overlay if calories exceed or other metrics are under goals.
 Persistence: Saves to localStorage under goals:YYYY-MM.
 Run: Open index.html directly; no build step.
+
