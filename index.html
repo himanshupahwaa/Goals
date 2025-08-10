@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Goals</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <h1 class="app-title">Goals</h1>
+        <div class="month-nav">
+          <button id="prevMonth" aria-label="Previous month" title="Previous month">&#x2039;</button>
+          <div id="monthLabel" class="month-label" aria-live="polite"></div>
+          <button id="nextMonth" aria-label="Next month" title="Next month">&#x203A;</button>
+        </div>
+      </header>
+
+      <main>
+        <noscript>
+          <div style="padding:12px;color:#fca5a5;background:#3f1d1d;border:1px solid #7f1d1d;border-radius:8px;margin-bottom:12px;">
+            JavaScript is required to display the calendar.
+          </div>
+        </noscript>
+        <div class="calendar" id="calendar" aria-label="Month view calendar"></div>
+      </main>
+
+      <footer class="app-footer">
+        <span class="hint">Click a day to edit details. Ctrl/Cmd-click to darken. Right-click to decrement.</span>
+      </footer>
+    </div>
+
+    <!-- Day editor modal -->
+    <div id="dayModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle" hidden>
+      <div class="modal-backdrop" data-modal-close></div>
+      <div class="modal-content">
+        <header class="modal-header">
+          <h2 id="dayModalTitle" class="modal-title">Edit Day</h2>
+          <button class="modal-close" aria-label="Close" title="Close" data-modal-close>×</button>
+        </header>
+        <form id="dayForm" class="modal-body">
+          <div class="field-grid">
+            <div class="field">
+              <label for="calories">Calories</label>
+              <input type="number" id="calories" name="calories" min="0" step="1" placeholder="e.g. 1800" />
+            </div>
+            <div class="field">
+              <label for="protein">Protein (g)</label>
+              <input type="number" id="protein" name="protein" min="0" step="1" placeholder="e.g. 120" />
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label for="pushups">Pushups (count)</label>
+              <input type="number" id="pushups" name="pushups" min="0" step="1" placeholder="e.g. 100" />
+            </div>
+            <div class="field">
+              <label for="crunches">Crunches (count)</label>
+              <input type="number" id="crunches" name="crunches" min="0" step="1" placeholder="e.g. 100" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="miles">Miles run</label>
+            <input type="number" id="miles" name="miles" min="0" step="0.1" placeholder="e.g. 3" />
+          </div>
+
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" id="workoutDone" name="workoutDone" />
+              <span>Workout done</span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label for="dietNotes">Diet notes</label>
+            <textarea id="dietNotes" name="dietNotes" rows="2" placeholder="What did you eat?" ></textarea>
+          </div>
+
+          <div class="field">
+            <label for="workoutNotes">Workout notes</label>
+            <textarea id="workoutNotes" name="workoutNotes" rows="2" placeholder="Workout details" ></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="resetDay" class="btn danger">Reset Day</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn" data-modal-close>Cancel</button>
+            <button type="submit" class="btn primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="script.js" defer></script>
+  </body>
+  </html>
+
+
