@@ -4,14 +4,53 @@ const MAX_INTENSITY = 8; // after this, further clicks keep max darkness
 let currentViewDate;
 // single-click opens modal; Ctrl/Cmd-click increments
 
-// Daily goals for 100% bars – tweak as desired
-const GOALS = {
-  protein: 120,     // grams
-  calories: 2000,   // kcal
-  pushups: 100,     // count
-  crunches: 100,    // count
-  miles: 3,         // miles
-};
+// Settings for custom fields persisted in localStorage
+function cryptoRandomId() {
+  try {
+    return (crypto.randomUUID && crypto.randomUUID()) || Array.from(crypto.getRandomValues(new Uint32Array(2))).map(n => n.toString(36)).join("");
+  } catch {
+    return String(Date.now()) + Math.random().toString(36).slice(2, 8);
+  }
+}
+
+function defaultSettings() {
+  return {
+    fields: [
+      { id: cryptoRandomId(), label: "Protein (g)", key: "protein", goal: 120, compare: "under", step: 1, min: 0 },
+      { id: cryptoRandomId(), label: "Calories", key: "calories", goal: 2000, compare: "over", step: 1, min: 0 },
+      { id: cryptoRandomId(), label: "Pushups", key: "pushups", goal: 100, compare: "under", step: 1, min: 0 },
+      { id: cryptoRandomId(), label: "Crunches", key: "crunches", goal: 100, compare: "under", step: 1, min: 0 },
+      { id: cryptoRandomId(), label: "Miles run", key: "miles", goal: 3, compare: "under", step: 0.1, min: 0 },
+    ],
+  };
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem("goals:settings");
+    if (!raw) return defaultSettings();
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.fields)) return defaultSettings();
+    const fields = parsed.fields
+      .map(f => ({
+        id: f.id || cryptoRandomId(),
+        label: String(f.label || "Field"),
+        key: String(f.key || "field" + Math.random().toString(36).slice(2,5)),
+        goal: Number(f.goal) || 0,
+        compare: f.compare === "over" ? "over" : "under",
+        step: Number(f.step) || 1,
+        min: Number(f.min) || 0,
+      }))
+      .slice(0, 5);
+    return { fields };
+  } catch {
+    return defaultSettings();
+  }
+}
+
+function saveSettings(settings) {
+  try { localStorage.setItem("goals:settings", JSON.stringify(settings)); } catch {}
+}
 
 function pad(value) { return String(value).padStart(2, "0"); }
 
@@ -48,7 +87,7 @@ function ensureDayRecord(entry) {
   if (typeof entry === "number") return { clicks: entry };
   if (typeof entry === "object") {
     const clicks = Number(entry.clicks ?? 0) || 0;
-    return {
+    const normalized = {
       clicks,
       calories: entry.calories != null ? Number(entry.calories) : undefined,
       protein: entry.protein != null ? Number(entry.protein) : undefined,
@@ -59,6 +98,15 @@ function ensureDayRecord(entry) {
       dietNotes: entry.dietNotes ?? "",
       workoutNotes: entry.workoutNotes ?? "",
     };
+    // Preserve any additional numeric custom fields
+    for (const key of Object.keys(entry)) {
+      if (key in normalized) continue;
+      const v = entry[key];
+      if (v == null) continue;
+      const n = Number(v);
+      if (Number.isFinite(n)) normalized[key] = n;
+    }
+    return normalized;
   }
   return { clicks: 0 };
 }
@@ -74,29 +122,23 @@ function coerceNumberOrZero(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function isDayOverLimit(record, viewDate, day, today) {
+function isDayOverLimit(record, viewDate, day, today, settings) {
   if (!record) return false;
   const dayDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
   const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const isPast = dayDate < todayDate; // only evaluate at end-of-day (past days)
   if (!isPast) return false;
 
-  const calories = coerceNumberOrZero(record.calories);
-  const protein = coerceNumberOrZero(record.protein);
-  const pushups = coerceNumberOrZero(record.pushups);
-  const crunches = coerceNumberOrZero(record.crunches);
-  const miles = coerceNumberOrZero(record.miles);
-
-  const caloriesOver = calories > GOALS.calories; // exceed goal
-  const proteinShort = protein < GOALS.protein;
-  const pushupsShort = pushups < GOALS.pushups;
-  const crunchesShort = crunches < GOALS.crunches;
-  const milesShort = miles < GOALS.miles;
-
-  return caloriesOver || proteinShort || pushupsShort || crunchesShort || milesShort;
+  const fields = (settings && settings.fields) ? settings.fields : [];
+  for (const f of fields) {
+    const val = coerceNumberOrZero(record[f.key]);
+    if (f.compare === "over" && val > f.goal) return true;
+    if (f.compare === "under" && val < f.goal) return true;
+  }
+  return false;
 }
 
-function renderBars(container, record) {
+function renderBars(container, record, settings) {
   const bars = document.createElement("div");
   bars.className = "bars";
 
@@ -115,13 +157,16 @@ function renderBars(container, record) {
     bars.appendChild(bar);
   };
 
-  addBar("protein", record.protein, GOALS.protein, "Protein");
-  addBar("calories", record.calories, GOALS.calories, "Calories");
-  addBar("pushups", record.pushups, GOALS.pushups, "Pushups");
-  addBar("crunches", record.crunches, GOALS.crunches, "Crunches");
-  addBar("miles", record.miles, GOALS.miles, "Miles");
+  const fields = (settings && settings.fields) ? settings.fields : [];
+  for (const f of fields) {
+    addBar(`dynamic ${cssSafeClass(f.key)}`, record[f.key], f.goal, f.label);
+  }
 
   container.appendChild(bars);
+}
+
+function cssSafeClass(key) {
+  return String(key).toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
 }
 
 function colorForCount(count) {
@@ -171,6 +216,7 @@ function renderCalendar(viewDate) {
   const { daysInMonth, startWeekday } = getMonthMeta(viewDate);
   const yearMonth = formatYearMonth(viewDate);
   const monthData = loadMonthData(yearMonth);
+  const settings = loadSettings();
 
   // leading empty cells
   for (let i = 0; i < startWeekday; i++) {
@@ -187,7 +233,7 @@ function renderCalendar(viewDate) {
   for (let day = 1; day <= daysInMonth; day++) {
     const record = ensureDayRecord(monthData[String(day)]);
     const count = Number(record.clicks || 0);
-    const overLimit = isDayOverLimit(record, viewDate, day, today);
+    const overLimit = isDayOverLimit(record, viewDate, day, today, settings);
 
     const cell = document.createElement("button");
     cell.className = "day-cell";
@@ -217,7 +263,7 @@ function renderCalendar(viewDate) {
 
     // Removed indicator pills for workout and calories
 
-    renderBars(cell, record);
+    renderBars(cell, record, settings);
 
     cell.addEventListener("click", (e) => {
       if (e.ctrlKey || e.metaKey) {
@@ -274,14 +320,31 @@ function openDayModal(yearMonth, day) {
   const form = document.getElementById("dayForm");
   const monthData = loadMonthData(yearMonth);
   const record = ensureDayRecord(monthData[String(day)]);
+  const settings = loadSettings();
 
   title.textContent = `Edit ${yearMonth}-${String(day).padStart(2, "0")}`;
-
-  form.elements.calories.value = record.calories ?? "";
-  form.elements.protein.value = record.protein ?? "";
-  if (form.elements.pushups) form.elements.pushups.value = record.pushups ?? "";
-  if (form.elements.crunches) form.elements.crunches.value = record.crunches ?? "";
-  if (form.elements.miles) form.elements.miles.value = record.miles ?? "";
+  // Build dynamic field inputs
+  const container = document.getElementById("customFieldsContainer");
+  container.innerHTML = "";
+  (settings.fields || []).forEach((f, idx) => {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const label = document.createElement("label");
+    label.setAttribute("for", `cf_${idx}`);
+    label.textContent = f.label;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.id = `cf_${idx}`;
+    input.name = f.key;
+    if (f.min != null) input.min = String(f.min);
+    if (f.step != null) input.step = String(f.step);
+    input.placeholder = `Goal: ${f.goal}`;
+    const v = record[f.key];
+    input.value = v != null ? String(v) : "";
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    container.appendChild(wrap);
+  });
   form.elements.workoutDone.checked = Boolean(record.workoutDone);
   form.elements.dietNotes.value = record.dietNotes ?? "";
   form.elements.workoutNotes.value = record.workoutNotes ?? "";
@@ -312,21 +375,19 @@ function setupModalHandlers() {
     const day = Number(form.dataset.day);
     const monthData = loadMonthData(yearMonth);
     const record = ensureDayRecord(monthData[String(day)]);
+    const settings = loadSettings();
 
-    const calories = form.elements.calories.value.trim();
-    const protein = form.elements.protein.value.trim();
-    const pushups = form.elements.pushups ? form.elements.pushups.value.trim() : "";
-    const crunches = form.elements.crunches ? form.elements.crunches.value.trim() : "";
-    const miles = form.elements.miles ? form.elements.miles.value.trim() : "";
+    // Read dynamic numeric fields
+    (settings.fields || []).forEach((f) => {
+      const el = form.elements[f.key];
+      if (!el) return;
+      const val = String(el.value).trim();
+      record[f.key] = val === "" ? undefined : Number(val);
+    });
     const workoutDone = form.elements.workoutDone.checked;
     const dietNotes = form.elements.dietNotes.value;
     const workoutNotes = form.elements.workoutNotes.value;
 
-    record.calories = calories === "" ? undefined : Number(calories);
-    record.protein = protein === "" ? undefined : Number(protein);
-    record.pushups = pushups === "" ? undefined : Number(pushups);
-    record.crunches = crunches === "" ? undefined : Number(crunches);
-    record.miles = miles === "" ? undefined : Number(miles);
     record.workoutDone = workoutDone;
     record.dietNotes = dietNotes;
     record.workoutNotes = workoutNotes;
@@ -352,9 +413,153 @@ function main() {
   currentViewDate = new Date();
   attachNav(currentViewDate);
   setupModalHandlers();
+  setupSettings();
   renderCalendar(currentViewDate);
 }
 
 document.addEventListener("DOMContentLoaded", main);
+
+// Settings UI
+function setupSettings() {
+  const openBtn = document.getElementById("openSettings");
+  const modal = document.getElementById("settingsModal");
+  const form = document.getElementById("settingsForm");
+  const fieldsList = document.getElementById("fieldsList");
+  const addFieldBtn = document.getElementById("addField");
+  const saveBtn = form ? form.querySelector('button[type="submit"]') : null;
+
+  if (!openBtn || !modal || !form || !fieldsList || !addFieldBtn) {
+    return; // settings UI not present
+  }
+
+  function close() {
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("hidden", "");
+  }
+  function open() {
+    renderFieldsEditor();
+    modal.removeAttribute("hidden");
+    modal.setAttribute("aria-hidden", "false");
+  }
+  modal.querySelectorAll("[data-settings-close]").forEach((el) => el.addEventListener("click", close));
+  openBtn.addEventListener("click", open);
+
+  function renderFieldsEditor() {
+    const settings = loadSettings();
+    fieldsList.innerHTML = "";
+    settings.fields.forEach((f, index) => {
+      const row = document.createElement("div");
+      row.className = "field-row";
+
+      const nameField = inputField(`label_${f.id}`, "Name", f.label);
+      const keyField = inputField(`key_${f.id}`, "Key", f.key);
+      const goalField = inputField(`goal_${f.id}`, "Goal", String(f.goal), "number", "0", "any");
+      const compareField = selectField(`cmp_${f.id}`, "X when", [
+        { v: "under", t: "under (incomplete)" },
+        { v: "over", t: "over (exceeds)" },
+      ], f.compare);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "btn icon";
+      removeBtn.innerText = "✕";
+      removeBtn.title = "Remove";
+      removeBtn.addEventListener("click", () => {
+        const s = loadSettings();
+        s.fields.splice(index, 1);
+        saveSettings(s);
+        renderFieldsEditor();
+        renderCalendar(currentViewDate);
+      });
+
+      row.appendChild(nameField.wrapper);
+      row.appendChild(keyField.wrapper);
+      row.appendChild(goalField.wrapper);
+      row.appendChild(compareField.wrapper);
+      row.appendChild(removeBtn);
+      fieldsList.appendChild(row);
+    });
+  }
+
+  addFieldBtn.addEventListener("click", () => {
+    const s = loadSettings();
+    if (s.fields.length >= 5) return;
+    s.fields.push({ id: cryptoRandomId(), label: "New field", key: `field${s.fields.length+1}`.toLowerCase(), goal: 0, compare: "under", step: 1, min: 0 });
+    saveSettings(s);
+    renderFieldsEditor();
+  });
+
+  function handleSave(e) {
+    if (e) e.preventDefault();
+    const s = loadSettings();
+    // read back values
+    s.fields = s.fields.map((f) => {
+      const labelEl = form.elements[`label_${f.id}`];
+      const keyEl = form.elements[`key_${f.id}`];
+      const goalEl = form.elements[`goal_${f.id}`];
+      const cmpEl = form.elements[`cmp_${f.id}`];
+      const next = { ...f };
+      if (labelEl) next.label = String(labelEl.value || next.label);
+      if (keyEl) next.key = String(keyEl.value || next.key).trim() || next.key;
+      if (goalEl) next.goal = Number(goalEl.value) || 0;
+      if (cmpEl) next.compare = cmpEl.value === "over" ? "over" : "under";
+      return next;
+    }).slice(0,5);
+    // ensure unique keys
+    const seen = new Set();
+    for (const f of s.fields) {
+      let base = f.key.toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+      let unique = base;
+      let counter = 1;
+      while (seen.has(unique)) { unique = `${base}-${counter++}`; }
+      f.key = unique;
+      seen.add(unique);
+    }
+    saveSettings(s);
+    close();
+    renderCalendar(currentViewDate);
+  }
+  form.addEventListener("submit", handleSave);
+  if (saveBtn) saveBtn.addEventListener("click", handleSave);
+}
+
+function inputField(name, labelText, value, type = "text", min, step) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "field";
+  const label = document.createElement("label");
+  label.setAttribute("for", name);
+  label.textContent = labelText;
+  const input = document.createElement("input");
+  input.type = type;
+  input.name = name;
+  input.id = name;
+  if (min != null) input.min = String(min);
+  if (step != null) input.step = String(step);
+  input.value = value ?? "";
+  wrapper.appendChild(label);
+  wrapper.appendChild(input);
+  return { wrapper, input };
+}
+
+function selectField(name, labelText, options, value) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "field";
+  const label = document.createElement("label");
+  label.setAttribute("for", name);
+  label.textContent = labelText;
+  const select = document.createElement("select");
+  select.name = name;
+  select.id = name;
+  for (const opt of options) {
+    const o = document.createElement("option");
+    o.value = opt.v;
+    o.textContent = opt.t;
+    if (opt.v === value) o.selected = true;
+    select.appendChild(o);
+  }
+  wrapper.appendChild(label);
+  wrapper.appendChild(select);
+  return { wrapper, select };
+}
 
 
