@@ -75,6 +75,7 @@ body {
 
 .month-nav button:hover { filter: brightness(1.12); }
 .month-nav button:active { transform: translateY(1px); }
+.month-nav #openSettings { width: 34px; height: 34px; font-size: 16px; }
 
 .month-label {
   min-width: 210px;
@@ -229,6 +230,8 @@ body {
   pointer-events: none;
 }
 /* bar-text overlay removed; using title attribute for hover */
+/* dynamic bars colors fallback (placed before specific types so it doesn't override them) */
+.bar.dynamic > span { background: linear-gradient(90deg, #60a5fa, #3b82f6); }
 .bar.protein > span { background: linear-gradient(90deg, #06b6d4, #0ea5e9); }
 .bar.calories > span { background: linear-gradient(90deg, #f59e0b, #f97316); }
 .bar.pushups > span { background: linear-gradient(90deg, #22c55e, #16a34a); }
@@ -261,6 +264,7 @@ body {
   box-shadow: 0 24px 80px rgba(0,0,0,0.5);
   backdrop-filter: blur(calc(var(--blur) + 2px)) saturate(130%);
   -webkit-backdrop-filter: blur(calc(var(--blur) + 2px)) saturate(130%);
+  overflow: hidden;
 }
 .modal-header {
   display: flex;
@@ -278,11 +282,11 @@ body {
   font-size: 22px;
   cursor: pointer;
 }
-.modal-body { padding: 14px 16px 16px; }
+.modal-body { padding: 14px 16px 16px; max-height: 70vh; overflow: auto; }
 .field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .field label { font-size: 12px; color: var(--muted); }
-.field input, .field textarea, .btn {
+.field input, .field textarea, .field select, .btn {
   background: #0f1421;
   color: var(--text);
   border: 1px solid var(--glass-border);
@@ -290,6 +294,10 @@ body {
   padding: 8px 10px;
   font-family: inherit;
 }
+.field-row { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,0.8fr) minmax(120px,0.9fr) minmax(150px,0.9fr) auto; gap: 8px; align-items: end; margin-bottom: 10px; width: 100%; }
+.field-row small { color: var(--muted); font-size: 11px; }
+.field-row .inline { display: flex; gap: 6px; align-items: center; }
+.btn.icon { width: 34px; height: 34px; display: grid; place-items: center; }
 
 .field input:focus, .field textarea:focus {
   outline: 2px solid color-mix(in oklab, var(--accent) 70%, white);
@@ -306,6 +314,7 @@ body {
 
 @media (max-width: 640px) {
   .field-grid { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr; }
 }
 
 .app-footer {
